@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>מערכת ניהול טיפול יומי</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@300;400;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Noto Sans Hebrew','Segoe UI',sans-serif;background:#faf9f7;-webkit-font-smoothing:antialiased}
+button,input,textarea,select{font-family:inherit}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script>
+if(!window.storage){window.storage={
+get:async function(k){var v=localStorage.getItem(k);if(v===null)throw new Error("Not found");return{key:k,value:v}},
+set:async function(k,v){localStorage.setItem(k,v);return{key:k,value:v}},
+delete:async function(k){localStorage.removeItem(k);return{key:k,deleted:true}},
+list:async function(p){p=p||"";var keys=[];for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k.indexOf(p)===0)keys.push(k)}return{keys:keys}}
+}}
+</script>
+<script type="text/babel" data-type="module">
+const { useState, useEffect, useCallback } = React;
+
+
+// ============ MEDICATION DATABASE ============
+const MEDICATION_DB = [
+  { id: "med_1", name: "דונפזיל (ממוריט, אסנטה)", generic: "Donepezil", category: "אלצהיימר", purpose: "שיפור תסמינים קוגניטיביים באלצהיימר" },
+  { id: "med_2", name: "ריבסטיגמין (אקסלון)", generic: "Rivastigmine", category: "אלצהיימר", purpose: "אלצהיימר קל–בינוני" },
+  { id: "med_3", name: "גלנטמין (רמניל)", generic: "Galantamine", category: "אלצהיימר", purpose: "אלצהיימר קל–בינוני" },
+  { id: "med_4", name: "ממנטין (ממוקס/אביקסה)", generic: "Memantine", category: "אלצהיימר", purpose: "אלצהיימר בינוני–חמור" },
+  { id: "med_5", name: "סרטרלין (לוסטרל)", generic: "Sertraline", category: "דיכאון/חרדה", purpose: "דיכאון/חרדה" },
+  { id: "med_6", name: "פלואוקסטין (פרוזק)", generic: "Fluoxetine", category: "דיכאון/חרדה", purpose: "דיכאון/חרדה" },
+  { id: "med_7", name: "אסציטלופרם (ציפרלקס)", generic: "Escitalopram", category: "דיכאון/חרדה", purpose: "דיכאון, חרדה" },
+  { id: "med_8", name: "סיטלופרם (ציפרמיל)", generic: "Citalopram", category: "דיכאון/חרדה", purpose: "דיכאון/חרדה" },
+  { id: "med_9", name: "מירטזפין (רמרון)", generic: "Mirtazapine", category: "דיכאון", purpose: "דיכאון; מועיל כשיש ירידה בתיאבון/שינה" },
+  { id: "med_10", name: "ונלפקסין", generic: "Venlafaxine", category: "דיכאון/חרדה", purpose: "דיכאון/חרדה" },
+  { id: "med_11", name: "דולוקסטין", generic: "Duloxetine", category: "דיכאון/כאב", purpose: "דיכאון + כאב נוירופתי" },
+  { id: "med_12", name: "וולבוטרין", generic: "Bupropion", category: "דיכאון", purpose: "דיכאון" },
+  { id: "med_13", name: "לוראזפאם (לוריבן)", generic: "Lorazepam", category: "חרדה/שינה", purpose: "חרדה/שינה" },
+  { id: "med_14", name: "זולפידם (סטילנוקס)", generic: "Zolpidem", category: "שינה", purpose: "נדודי שינה" },
+  { id: "med_15", name: "בוספירון", generic: "Buspirone", category: "חרדה", purpose: "חרדה" },
+  { id: "med_16", name: "ריספרידון", generic: "Risperidone", category: "פסיכוזה/דמנציה", purpose: "הפרעות התנהגות/פסיכוזה" },
+  { id: "med_17", name: "קווטיאפין", generic: "Quetiapine", category: "פסיכוזה/דמנציה", purpose: "אי שקט בדמנציה" },
+  { id: "med_18", name: "לבודופה/קרבידופה", generic: "Carbidopa/Levodopa", category: "פרקינסון", purpose: "תסמיני פרקינסון" },
+  { id: "med_19", name: "לבטיראצטם", generic: "Levetiracetam", category: "אפילפסיה", purpose: "פרכוסים" },
+  { id: "med_20", name: "מטפורמין (גלוקופאג׳)", generic: "Metformin", category: "סוכרת", purpose: "סוכרת סוג 2" },
+  { id: "med_21", name: "גלימפיריד (אמריל)", generic: "Glimepiride", category: "סוכרת", purpose: "הורדת סוכר" },
+  { id: "med_22", name: "סיטגליפטין (ג׳נובייה)", generic: "Sitagliptin", category: "סוכרת", purpose: "הורדת סוכר" },
+  { id: "med_23", name: "לינגליפטין (טרג׳נטה)", generic: "Linagliptin", category: "סוכרת", purpose: "הורדת סוכר" },
+  { id: "med_24", name: "סמגלוטיד (אוזמפיק)", generic: "Semaglutide", category: "סוכרת", purpose: "הורדת סוכר/משקל" },
+  { id: "med_25", name: "לירגלוטיד (ויקטוזה)", generic: "Liraglutide", category: "סוכרת", purpose: "הורדת סוכר/משקל" },
+  { id: "med_26", name: "דאפאגליפלוזין (פורסיגה)", generic: "Dapagliflozin", category: "סוכרת", purpose: "סוכרת; גם לב/כליה" },
+  { id: "med_27", name: "אמפאגליפלוזין (ג׳רדיאנס)", generic: "Empagliflozin", category: "סוכרת", purpose: "סוכרת; גם לב/כליה" },
+  { id: "med_28", name: "אינסולין גלרג׳ין (לנטוס)", generic: "Insulin glargine", category: "אינסולין", purpose: "אינסולין בזאלי" },
+  { id: "med_29", name: "אינסולין אספרט (נובורפיד)", generic: "Insulin aspart", category: "אינסולין", purpose: "כיסוי ארוחות" },
+  { id: "med_30", name: "אינסולין דגלודק (טרגלודק)", generic: "Insulin degludec", category: "אינסולין", purpose: "אינסולין בזאלי ארוך" },
+  { id: "med_31", name: "אמלודיפין (נורבסק)", generic: "Amlodipine", category: "לחץ דם", purpose: "יתר לחץ דם/תעוקה" },
+  { id: "med_32", name: "רמיפריל (טריטייס)", generic: "Ramipril", category: "לחץ דם", purpose: "יתר לחץ דם/אי״ס לב" },
+  { id: "med_33", name: "אנאלפריל", generic: "Enalapril", category: "לחץ דם", purpose: "יתר לחץ דם/אי״ס לב" },
+  { id: "med_34", name: "לוסרטן (אוקסאר)", generic: "Losartan", category: "לחץ דם", purpose: "יתר לחץ דם" },
+  { id: "med_35", name: "ולסרטן (דיובן)", generic: "Valsartan", category: "לחץ דם", purpose: "יתר לחץ דם/אי״ס לב" },
+  { id: "med_36", name: "מטופרולול", generic: "Metoprolol", category: "לחץ דם", purpose: "יתר לחץ דם/תעוקה" },
+  { id: "med_37", name: "ביסופרולול (קונקור)", generic: "Bisoprolol", category: "לחץ דם", purpose: "יתר לחץ דם/אי״ס לב" },
+  { id: "med_38", name: "הידרוכלורותיאזיד", generic: "Hydrochlorothiazide", category: "לחץ דם – משתנים", purpose: "הורדת לחץ דם" },
+  { id: "med_39", name: "פורוסמיד (פוסיד)", generic: "Furosemide", category: "אי״ס לב/בצקות", purpose: "בצקות/אי־ספיקת לב" },
+  { id: "med_40", name: "ספירונולקטון (אלדקטון)", generic: "Spironolactone", category: "אי״ס לב", purpose: "אי־ספיקת לב" },
+  { id: "med_41", name: "אנטרסטו", generic: "Sacubitril/Valsartan", category: "אי״ס לב", purpose: "אי־ספיקת לב עם EF ירוד" },
+  { id: "med_42", name: "דיגוקסין", generic: "Digoxin", category: "אי״ס לב/פרפור", purpose: "שליטה בקצב/אי״ס לב" },
+  { id: "med_43", name: "אטורבסטטין (ליפיטור)", generic: "Atorvastatin", category: "כולסטרול", purpose: "הורדת LDL" },
+  { id: "med_44", name: "רוזובסטטין (קרסטור)", generic: "Rosuvastatin", category: "כולסטרול", purpose: "הורדת LDL" },
+  { id: "med_45", name: "אזטימיב (איזטרול)", generic: "Ezetimibe", category: "כולסטרול", purpose: "הפחתת ספיגת כולסטרול" },
+  { id: "med_46", name: "וורפרין (קומדין)", generic: "Warfarin", category: "נוגדי קרישה", purpose: "דילול דם" },
+  { id: "med_47", name: "אפיקסבאן", generic: "Apixaban", category: "נוגדי קרישה", purpose: "דילול דם" },
+  { id: "med_48", name: "ריברוקסבאן (קסרלטו)", generic: "Rivaroxaban", category: "נוגדי קרישה", purpose: "דילול דם" },
+  { id: "med_49", name: "אספירין", generic: "Aspirin", category: "נוגדי טסיות", purpose: "מניעה שניונית" },
+  { id: "med_50", name: "קלופידוגרל (פלאביקס)", generic: "Clopidogrel", category: "נוגדי טסיות", purpose: "מניעה טסית" },
+  { id: "med_51", name: "אקמול (פרצטמול)", generic: "Paracetamol", category: "כאב", purpose: "כאב/חום" },
+  { id: "med_52", name: "איבופרופן", generic: "Ibuprofen", category: "כאב/דלקת", purpose: "כאב/דלקת" },
+  { id: "med_53", name: "גבאפנטין", generic: "Gabapentin", category: "כאב נוירופתי", purpose: "כאב נוירופתי" },
+  { id: "med_54", name: "פרגאבאלין (ליריקה)", generic: "Pregabalin", category: "כאב נוירופתי", purpose: "כאב נוירופתי" },
+  { id: "med_55", name: "אומפרזול", generic: "Omeprazole", category: "קיבה/רפלוקס", purpose: "רפלוקס/כיב" },
+  { id: "med_56", name: "פנטופרזול", generic: "Pantoprazole", category: "קיבה/רפלוקס", purpose: "רפלוקס/כיב" },
+  { id: "med_57", name: "לקטולוז (אבילאק)", generic: "Lactulose", category: "עצירות", purpose: "עצירות" },
+  { id: "med_58", name: "פגלקס", generic: "PEG", category: "עצירות", purpose: "עצירות" },
+  { id: "med_59", name: "אלטרוקסין", generic: "Levothyroxine", category: "בלוטת התריס", purpose: "תת־פעילות תריס" },
+  { id: "med_60", name: "טמסולוסין", generic: "Tamsulosin", category: "ערמונית", purpose: "שיפור זרימת שתן" },
+  { id: "med_61", name: "פינסטריד", generic: "Finasteride", category: "ערמונית", purpose: "הקטנת נפח ערמונית" },
+  { id: "med_62", name: "אלנדרונט", generic: "Alendronate", category: "אוסטאופורוזיס", purpose: "חיזוק עצם" },
+  { id: "med_63", name: "דנוסומאב", generic: "Denosumab", category: "אוסטאופורוזיס", purpose: "טיפול באוסטאופורוזיס" },
+  { id: "med_64", name: "סלבוטמול (ונטולין)", generic: "Salbutamol", category: "אסתמה/COPD", purpose: "מרחיב סמפונות" },
+  { id: "med_65", name: "טיוטרופיום", generic: "Tiotropium", category: "COPD", purpose: "מרחיב סמפונות ארוך" },
+  { id: "med_66", name: "לטנופרוסט", generic: "Latanoprost", category: "גלאוקומה", purpose: "הורדת לחץ תוך־עיני" },
+  { id: "med_67", name: "טימולול", generic: "Timolol", category: "גלאוקומה", purpose: "הורדת לחץ תוך־עיני" },
+  { id: "med_68", name: "אלופורינול (זילופרים)", generic: "Allopurinol", category: "גאוט", purpose: "הורדת חומצה אורית" },
+  { id: "med_69", name: "קולכיצין", generic: "Colchicine", category: "גאוט", purpose: "התקף גאוט" },
+  { id: "med_70", name: "אמיודרון", generic: "Amiodarone", category: "הפרעות קצב", purpose: "הפרעות קצב" },
+  { id: "med_71", name: "ברזל פומי", generic: "Ferrous salts", category: "אנמיה", purpose: "חסר ברזל" },
+  { id: "med_72", name: "אלפא-D3", generic: "Alfacalcidol", category: "כליות/ויטמין D", purpose: "הפרעות מטבוליזם עצם" },
+  // אלצהיימר – משנה מהלך
+  { id: "med_73", name: "לקנמב/לקמבי (Leqembi)", generic: "Lecanemab", category: "אלצהיימר – נוגדנים", purpose: "אלצהיימר בשלב מוקדם, פינוי עמילואיד" },
+  { id: "med_74", name: "דוננמב/קיסונלה (Kisunla)", generic: "Donanemab", category: "אלצהיימר – נוגדנים", purpose: "אלצהיימר מוקדם" },
+  // דיכאון/חרדה – נוספים
+  { id: "med_75", name: "אמיטריפטילין (אלטרול)", generic: "Amitriptyline", category: "דיכאון/כאב – TCA", purpose: "דיכאון/כאב נוירופתי; זהירות בקשישים" },
+  // חרדה/שינה – בנזודיאזפינים
+  { id: "med_76", name: "דיאזפאם (ואליום)", generic: "Diazepam", category: "חרדה/שינה", purpose: "חרדה/עוויתות; זהירות בקשישים" },
+  { id: "med_77", name: "נומבון (ניטראזפאם)", generic: "Nitrazepam", category: "שינה", purpose: "נדודי שינה קצרי־טווח" },
+  // מצב רוח
+  { id: "med_78", name: "ליתיום", generic: "Lithium", category: "מצב רוח", purpose: "ביפולר/מאניה; דורש ניטור צמוד" },
+  // אפילפסיה
+  { id: "med_79", name: "פניטואין", generic: "Phenytoin", category: "אפילפסיה", purpose: "פרכוסים; דורש מעקב רמות" },
+  // סוכרת – נוספים
+  { id: "med_80", name: "גליפיזיד", generic: "Glipizide", category: "סוכרת", purpose: "הורדת סוכר; סיכון היפוגליקמיה" },
+  { id: "med_81", name: "גליבנקלאמיד (גלובן/דאוניל)", generic: "Glibenclamide", category: "סוכרת – זהירות", purpose: "הורדת סוכר; סיכון גבוה להיפוגליקמיה בקשישים" },
+  { id: "med_82", name: "וילדגליפטין (גלבוס)", generic: "Vildagliptin", category: "סוכרת – DPP4", purpose: "הורדת סוכר" },
+  { id: "med_83", name: "סקסגליפטין (אונגליזה)", generic: "Saxagliptin", category: "סוכרת – DPP4", purpose: "הורדת סוכר" },
+  { id: "med_84", name: "דולגלוטיד (טרוליסיטי)", generic: "Dulaglutide", category: "סוכרת – GLP1", purpose: "הורדת סוכר" },
+  { id: "med_85", name: "רפאגליניד (נובונורם)", generic: "Repaglinide", category: "סוכרת", purpose: "הורדת סוכר סביב ארוחות" },
+  { id: "med_86", name: "אקרבוז (פרנדז)", generic: "Acarbose", category: "סוכרת", purpose: "הורדת סוכר אחרי ארוחות" },
+  { id: "med_87", name: "פיוגליטזון (אקטוס)", generic: "Pioglitazone", category: "סוכרת – TZD", purpose: "הורדת סוכר; זהירות באי״ס לב" },
+  // אינסולין – נוספים
+  { id: "med_88", name: "אינסולין ליספרו (הומאלוג)", generic: "Insulin lispro", category: "אינסולין – מהיר", purpose: "כיסוי ארוחות" },
+  { id: "med_89", name: "אינסולין גלוליזין (אפידרה)", generic: "Insulin glulisine", category: "אינסולין – מהיר", purpose: "כיסוי ארוחות" },
+  { id: "med_90", name: "אינסולין רגולרי (אקטראפיד)", generic: "Regular insulin", category: "אינסולין – קצר", purpose: "כיסוי ארוחות/תיקונים" },
+  { id: "med_91", name: "NPH אינסולין (הומולין N)", generic: "NPH insulin", category: "אינסולין – בינוני", purpose: "אינסולין בזאלי ביניים" },
+  { id: "med_92", name: "נובומיקס (אינסולין מעורב)", generic: "Mixed insulin aspart", category: "אינסולין – מעורב", purpose: "כיסוי בזאלי+ארוחות" },
+  // לחץ דם – נוספים
+  { id: "med_93", name: "כלורתלידון", generic: "Chlorthalidone", category: "לחץ דם – משתנים", purpose: "משתן תיאזידי; יעיל לאורך זמן" },
+  { id: "med_94", name: "ליסינופריל", generic: "Lisinopril", category: "לחץ דם – ACEI", purpose: "יתר לחץ דם/אי״ס לב" },
+  { id: "med_95", name: "קנדסרטן (אטקנד)", generic: "Candesartan", category: "לחץ דם – ARB", purpose: "יתר לחץ דם/אי״ס לב" },
+  { id: "med_96", name: "אטנולול (נורמיטן)", generic: "Atenolol", category: "לחץ דם – חוסמי בטא", purpose: "יתר לחץ דם" },
+  { id: "med_97", name: "ניפדיפין", generic: "Nifedipine", category: "לחץ דם – חוסמי סידן", purpose: "יתר לחץ דם" },
+  { id: "med_98", name: "דילטיאזם", generic: "Diltiazem", category: "הפרעות קצב/לחץ דם", purpose: "פרפור/לחץ דם/תעוקה" },
+  { id: "med_99", name: "ורפמיל", generic: "Verapamil", category: "הפרעות קצב/לחץ דם", purpose: "הפרעות קצב/לחץ דם; זהירות בעצירות" },
+  { id: "med_100", name: "דוקסזוסין (קרדורל)", generic: "Doxazosin", category: "לחץ דם/ערמונית", purpose: "יתר לחץ דם/ערמונית; סיכון תת־ל״ד" },
+  { id: "med_101", name: "פלודיפין", generic: "Felodipine", category: "לחץ דם – חוסמי סידן", purpose: "יתר לחץ דם" },
+  // אי״ס לב – נוספים
+  { id: "med_102", name: "טורסמיד", generic: "Torsemide", category: "אי״ס לב/בצקות", purpose: "בצקות/אי־ספיקת לב; חלופה לפורוסמיד" },
+  { id: "med_103", name: "בומטניד", generic: "Bumetanide", category: "אי״ס לב/בצקות", purpose: "בצקות/אי־ספיקת לב; חלופה לפורוסמיד" },
+  { id: "med_104", name: "אפלרנון (אינספירה)", generic: "Eplerenone", category: "אי״ס לב", purpose: "אי־ספיקת לב; פחות ת״ל הורמונליות" },
+  { id: "med_105", name: "אמילוריד", generic: "Amiloride", category: "משתנים משמרי אשלגן", purpose: "מניעת היפוקלמיה" },
+  { id: "med_106", name: "קרבידילול", generic: "Carvedilol", category: "אי״ס לב – חוסמי בטא", purpose: "אי״ס לב/אחרי אוטם/לחץ דם" },
+  { id: "med_107", name: "נביוולול", generic: "Nebivolol", category: "לחץ דם – חוסמי בטא", purpose: "יתר לחץ דם; מועדף בחלק מהקשישים" },
+  { id: "med_108", name: "קוראלן", generic: "Ivabradine", category: "אי״ס לב", purpose: "אי״ס לב עם דופק גבוה בסינוס" },
+  { id: "med_109", name: "הידרלאזין", generic: "Hydralazine", category: "לחץ דם/אי״ס לב", purpose: "יתר לחץ דם עמיד/אי״ס לב" },
+  { id: "med_110", name: "מינוקסידיל", generic: "Minoxidil", category: "לחץ דם", purpose: "יתר לחץ דם עמיד" },
+  // תעוקת חזה
+  { id: "med_111", name: "ניטרוגליצרין (ספריי/תת־לשון)", generic: "Nitroglycerin", category: "תעוקת חזה", purpose: "הקלה מהירה בכאבי חזה (אנגינה)" },
+  { id: "med_112", name: "איזוסורביד (מונוניטרט/דיניטרט)", generic: "Isosorbide", category: "תעוקת חזה", purpose: "מניעת אנגינה; זהירות ירידת ל״ד" },
+  // כולסטרול – נוספים
+  { id: "med_113", name: "סימבסטטין", generic: "Simvastatin", category: "כולסטרול", purpose: "הורדת LDL" },
+  { id: "med_114", name: "פראבסטטין", generic: "Pravastatin", category: "כולסטרול", purpose: "הורדת LDL; פחות אינטראקציות" },
+  { id: "med_115", name: "פנופיבראט / בזאפיבראט (בזאליפ)", generic: "Fenofibrate/Bezafibrate", category: "כולסטרול – פיבראטים", purpose: "טריגליצרידים גבוהים" },
+  { id: "med_116", name: "אלירוקומאב (פראלואנט)", generic: "Alirocumab", category: "כולסטרול – PCSK9", purpose: "הורדת LDL משמעותית (זריקות)" },
+  { id: "med_117", name: "אבולוקומאב", generic: "Evolocumab", category: "כולסטרול – PCSK9", purpose: "הורדת LDL משמעותית (זריקות)" },
+  // נוגדי קרישה – נוספים
+  { id: "med_118", name: "דביגטראן (פרדקסה)", generic: "Dabigatran", category: "נוגדי קרישה – DOAC", purpose: "דילול דם; תלוי תפקוד כלייתי" },
+  // כליות
+  { id: "med_119", name: "סבלאמר (רנוולה)", generic: "Sevelamer", category: "כליות – קושרי זרחן", purpose: "היפרפוספטמיה ב־CKD/דיאליזה" },
+  { id: "med_120", name: "לנתנום קרבונט (פוסרנול)", generic: "Lanthanum carbonate", category: "כליות – קושרי זרחן", purpose: "היפרפוספטמיה ב־CKD" },
+  { id: "med_121", name: "קלציום אצטט (פוסלו)", generic: "Calcium acetate", category: "כליות – קושרי זרחן", purpose: "היפרפוספטמיה ב־CKD" },
+  { id: "med_122", name: "קלציום קרבונט", generic: "Calcium carbonate", category: "כליות", purpose: "קושר זרחן/סידן" },
+  { id: "med_123", name: "קייאקסלאט", generic: "Sodium polystyrene sulfonate", category: "כליות – איזון אשלגן", purpose: "היפרקלמיה" },
+  { id: "med_124", name: "פטירומר (Veltassa)", generic: "Patiromer", category: "כליות – איזון אשלגן", purpose: "היפרקלמיה כרונית" },
+  { id: "med_125", name: "לוקלמה", generic: "Sodium zirconium cyclosilicate", category: "כליות – איזון אשלגן", purpose: "היפרקלמיה" },
+  { id: "med_126", name: "פאריקלציטול (זמפלר)", generic: "Paricalcitol", category: "כליות – ויטמין D", purpose: "היפרפראתיואידיזם משני ב־CKD" },
+  { id: "med_127", name: "סינקלצט (מימפרה)", generic: "Cinacalcet", category: "כליות – PTH", purpose: "הורדת PTH בהיפרפראתיואידיזם משני" },
+  // אנמיה – ESA
+  { id: "med_128", name: "אפואטין אלפא (אפרקס)", generic: "Epoetin alfa", category: "אנמיה – ESA", purpose: "טיפול באנמיה על רקע CKD" },
+  { id: "med_129", name: "דארבפואטין (ארנספ)", generic: "Darbepoetin alfa", category: "אנמיה – ESA", purpose: "טיפול באנמיה על רקע CKD" },
+  // ברזל – IV
+  { id: "med_130", name: "ונופר (ברזל סוכרוז)", generic: "Iron sucrose", category: "ברזל – IV", purpose: "חסר ברזל כשפומי לא מתאים" },
+  { id: "med_131", name: "פרינג׳קט", generic: "Ferric carboxymaltose", category: "ברזל – IV", purpose: "חסר ברזל (מתן ורידי)" },
+  // השתלות
+  { id: "med_132", name: "פרדניזון", generic: "Prednisone", category: "השתלות/דלקת", purpose: "דיכוי חיסוני/דלקת" },
+  { id: "med_133", name: "טקרולימוס (פרוגרף)", generic: "Tacrolimus", category: "השתלות", purpose: "מניעת דחיית שתל" },
+  { id: "med_134", name: "ציקלוספורין", generic: "Cyclosporine", category: "השתלות", purpose: "מניעת דחיית שתל" },
+  { id: "med_135", name: "מיקופנולט (סלספט/מיפורטיק)", generic: "Mycophenolate", category: "השתלות", purpose: "מניעת דחיית שתל" },
+  { id: "med_136", name: "סירולימוס (רפמיון)", generic: "Sirolimus", category: "השתלות", purpose: "מניעת דחיית שתל" },
+  // כאב – נוספים
+  { id: "med_137", name: "נאפרוקסן/דיקלופנק", generic: "Naproxen/Diclofenac", category: "כאב/דלקת – NSAIDs", purpose: "כאב/דלקת; זהירות כליה/דימום" },
+  { id: "med_138", name: "מורפין", generic: "Morphine", category: "כאב – אופיואידים", purpose: "כאב חזק; סיכון נפילות/בלבול" },
+  { id: "med_139", name: "אוקסיקודון/פנטניל/בופרנורפין", generic: "Oxycodone/Fentanyl/Buprenorphine", category: "כאב – אופיואידים", purpose: "כאב חזק (בהתאמה)" },
+  // גאוט – נוסף
+  { id: "med_140", name: "פבוקסוסטט (פבוריק)", generic: "Febuxostat", category: "גאוט", purpose: "הורדת חומצה אורית; חלופה לאלופורינול" },
+  // עיכול – נוספים
+  { id: "med_141", name: "פמוטידין", generic: "Famotidine", category: "קיבה – H2", purpose: "צרבת/כיב; חלופה ל-PPI" },
+  { id: "med_142", name: "ביסקודיל (לקסדין)", generic: "Bisacodyl", category: "עצירות", purpose: "עצירות" },
+  { id: "med_143", name: "סנה", generic: "Senna", category: "עצירות", purpose: "עצירות" },
+  // שלפוחית
+  { id: "med_144", name: "אוקסיבוטינין", generic: "Oxybutynin", category: "שלפוחית רגיזה", purpose: "דחיפות/דליפות; זהירות בקשישים" },
+  { id: "med_145", name: "מירבגרון", generic: "Mirabegron", category: "שלפוחית רגיזה", purpose: "חלופה פחות אנטיכולינרגית" },
+  // אוסטאופורוזיס – נוסף
+  { id: "med_146", name: "ריזדרונט", generic: "Risedronate", category: "אוסטאופורוזיס", purpose: "חיזוק עצם ומניעת שברים" },
+  // אנטיביוטיקה
+  { id: "med_147", name: "אמוקסיצילין", generic: "Amoxicillin", category: "אנטיביוטיקה", purpose: "זיהומים שכיחים" },
+  { id: "med_148", name: "צפלכסין", generic: "Cephalexin", category: "אנטיביוטיקה", purpose: "זיהומים שכיחים" },
+  { id: "med_149", name: "דוקסיציקלין", generic: "Doxycycline", category: "אנטיביוטיקה", purpose: "זיהומים שכיחים" },
+  { id: "med_150", name: "ניטרופורנטואין", generic: "Nitrofurantoin", category: "אנטיביוטיקה – זהירות", purpose: "UTI; לא מתאים בירידה כלייתית" },
+];
+
+// ============ SVG ICON COMPONENT ============
+const I = ({ d, size = 20, color = "#888", sw = 2 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"><path d={d}/></svg>;
+const Ic = {
+  check: (s, c) => <I d="M20 6L9 17l-5-5" size={s} color={c} sw={2.5} />,
+  pill: (s, c) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.5 1.5l3 3-8 8-3-3a4.24 4.24 0 010-6l2-2a4.24 4.24 0 016 0z"/><line x1="12" y1="12" x2="17.5" y2="17.5"/></svg>,
+  drop: (s, c) => <I d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z" size={s} color={c} />,
+  fork: (s, c) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2M7 2v20M21 15V2a5 5 0 00-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/></svg>,
+  run: (s, c) => <I d="M22 12l-4 0-3 9-6-18-3 9-4 0" size={s} color={c} />,
+  brain: (s, c) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a5 5 0 014.5 2.8A4 4 0 0120 9a4 4 0 01-1 7.5 5 5 0 01-7 4.5 5 5 0 01-7-4.5A4 4 0 014 9a4 4 0 013.5-4.2A5 5 0 0112 2z"/><path d="M12 2v20"/></svg>,
+  steth: (s, c) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4.8 2.3A.3.3 0 105 2H4a2 2 0 00-2 2v5a6 6 0 006 6 6 6 0 006-6V4a2 2 0 00-2-2h-1a.2.2 0 10.3.3M8 15v1a6 6 0 006 6 6 6 0 006-6v-4"/><circle cx="20" cy="10" r="2"/></svg>,
+  alert: (s, c) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.73 18l-8-14a2 2 0 00-3.48 0l-8 14A2 2 0 004 21h16a2 2 0 001.73-3z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+  smile: (s, c) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>,
+  clip: (s, c) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/></svg>,
+  user: (s, c) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+  home: (s, c) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  edit: (s, c) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4z"/></svg>,
+  plus: (s, c) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+  x: (s, c) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  down: (s, c) => <I d="M6 9l6 6 6-6" size={s} color={c} />,
+  left: (s, c) => <I d="M15 18l-6-6 6-6" size={s} color={c} />,
+  right: (s, c) => <I d="M9 18l6-6-6-6" size={s} color={c} />,
+  shield: (s, c) => <I d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" size={s} color={c} />,
+  save: (s, c) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
+  print: (s, c) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>,
+  wc: (s, c) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><rect x="7" y="2" width="10" height="4" rx="1"/><path d="M5 6h14v2a7 7 0 01-14 0V6z"/><path d="M9 15v4a2 2 0 002 2h2a2 2 0 002-2v-4"/></svg>,
+  note: (s, c) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
+};
+
+// ============ REUSABLE COMPONENTS ============
+const Chk = ({ on, toggle, size = 22 }) => (
+  <div onClick={toggle} style={{ width: size, height: size, borderRadius: 6, border: on ? "none" : "2px solid #d0ccc6", background: on ? "#5a5650" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.15s", flexShrink: 0 }}>
+    {on && Ic.check(size - 6, "#fff")}
+  </div>
+);
+
+const Circ = ({ icon, bg = "#f3f0ec", color = "#8b7565", size = 40 }) => (
+  <div style={{ width: size, height: size, borderRadius: 12, background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+    {Ic[icon]?.(size * 0.48, color)}
+  </div>
+);
+
+const Btn = ({ children, v = "primary", sm, full, dis, onClick, sx = {} }) => {
+  const base = { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, border: "none", fontFamily: "inherit", cursor: dis ? "not-allowed" : "pointer", transition: "all 0.15s", fontWeight: 600, borderRadius: sm ? 8 : 12, padding: sm ? "8px 14px" : "12px 24px", fontSize: sm ? 13 : 15, width: full ? "100%" : undefined, opacity: dis ? 0.4 : 1 };
+  const vs = { primary: { background: "#4a4a4a", color: "#fff" }, soft: { background: "#f3f0ec", color: "#5a4e42" }, outline: { background: "transparent", color: "#5a4e42", border: "1.5px solid #d8d3cc" }, danger: { background: "#f5e6e4", color: "#b5544d" }, green: { background: "#7c9a6e", color: "#fff" } };
+  return <button onClick={dis ? undefined : onClick} style={{ ...base, ...vs[v], ...sx }}>{children}</button>;
+};
+
+const Inp = ({ sx, ...p }) => <input {...p} style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e2ddd6", fontSize: 14, fontFamily: "inherit", direction: "rtl", background: "#fff", outline: "none", boxSizing: "border-box", ...sx }} />;
+const Txa = ({ sx, ...p }) => <textarea {...p} style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e2ddd6", fontSize: 14, fontFamily: "inherit", direction: "rtl", background: "#fff", outline: "none", boxSizing: "border-box", resize: "vertical", minHeight: 48, ...sx }} />;
+const Tag = ({ children, on, onClick, c }) => <span onClick={onClick} style={{ display: "inline-block", padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: onClick ? "pointer" : "default", background: on ? (c || "#4a4a4a") : "#f3f0ec", color: on ? "#fff" : "#6b6058", border: "none" }}>{children}</span>;
+const Card = ({ children, sx }) => <div style={{ background: "#fff", borderRadius: 14, marginBottom: 10, boxShadow: "0 1px 3px rgba(0,0,0,0.03)", overflow: "hidden", ...sx }}>{children}</div>;
+
+// ============ PRIVACY ============
+const PRIVACY_TEXT = `הודעה על איסוף מידע בהתאם לתיקון 13 לחוק הגנת הפרטיות, התשמ"א-1981\n\nמטרת האיסוף: ניהול ומעקב אחר הטיפול היומי של המטופל/ת.\n\nסוגי המידע: פרטי זיהוי, מידע רפואי, תיעוד פעולות טיפול, פרטי קשר.\n\nהשימוש: אך ורק לצורכי ניהול הטיפול והעברת דוחות לגורמים רפואיים בהסכמתך.\n\nאחסון: מקומי במכשירך. לא מועבר לצד שלישי.\n\nזכויות: עיון, תיקון, מחיקה בכל עת.\n\nמסירת המידע מרצונך החופשי.`;
+
+// ============ HELPERS ============
+const today = () => new Date().toISOString().split("T")[0];
+const fmtD = d => new Date(d + "T00:00:00").toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+const fmtT = () => new Date().toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+
+// ============ MAIN ============
+function CareApp() {
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState(null);
+  const [step, setStep] = useState(0);
+  const [page, setPage] = useState("dashboard");
+  const [log, setLogState] = useState(null);
+  const [date, setDate] = useState(today());
+  const [toast, setToast] = useState("");
+
+  useEffect(() => { (async () => { try { const r = await window.storage.get("care-profile"); if (r?.value) { setProfile(JSON.parse(r.value)); setStep(3); } } catch(e){} setLoading(false); })(); }, []);
+  useEffect(() => { if (!profile) return; (async () => { try { const r = await window.storage.get(`log:${date}`); if (r?.value) setLogState(JSON.parse(r.value)); else setLogState(mkLog(profile, date)); } catch(e) { setLogState(mkLog(profile, date)); } })(); }, [date, profile]);
+
+  const mkLog = (p, d) => ({ date: d, medications: (p.medications||[]).map(m => ({ ...m, given: false, time: "", reason: "" })), bathing: { done: false, types: [], notes: "" }, meals: { breakfast: { done: false, notes: "" }, lunch: { done: false, notes: "" }, dinner: { done: false, notes: "" }, snacks: { done: false, notes: "" } }, fluids: 0, toileting: [], diapers: 0, physicalActivity: { done: false, type: "", duration: "", notes: "" }, cognitiveActivity: { done: false, type: "", duration: "", notes: "" }, doctorVisit: { done: false, doctor: "", reason: "", notes: "" }, incidents: [], mood: "", dementiaSymptoms: [], customDementia: "", sleep: "", generalNotes: "" });
+
+  const saveLog = async (l) => { setLogState(l); try { await window.storage.set(`log:${date}`, JSON.stringify(l)); setToast("נשמר"); setTimeout(() => setToast(""), 1300); } catch(e){} };
+  const savePro = async (p) => { setProfile(p); try { await window.storage.set("care-profile", JSON.stringify(p)); } catch(e){} };
+
+  if (loading) return <div style={{ direction: "rtl", fontFamily: "'Noto Sans Hebrew',sans-serif", display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#faf9f7" }}><span style={{ color: "#999" }}>טוען...</span></div>;
+  if (step < 3) return <div style={{ direction: "rtl", fontFamily: "'Noto Sans Hebrew','Segoe UI',sans-serif", minHeight: "100vh", background: "#faf9f7", color: "#3a3630" }}><div style={{ maxWidth: 700, margin: "0 auto", padding: 16 }}><Setup step={step} setStep={setStep} onDone={savePro} /></div></div>;
+
+  const nav = [{ k: "dashboard", l: "יומן", i: "home" }, { k: "meds", l: "תרופות", i: "pill" }, { k: "report", l: "דוח", i: "clip" }, { k: "profile", l: "פרופיל", i: "user" }];
+
+  return (
+    <div style={{ direction: "rtl", fontFamily: "'Noto Sans Hebrew','Segoe UI',sans-serif", minHeight: "100vh", background: "#faf9f7", color: "#3a3630", paddingBottom: 80 }}>
+      <div style={{ maxWidth: 700, margin: "0 auto", padding: "0 16px" }}>
+        <div style={{ textAlign: "center", padding: "20px 0 6px" }}>
+          <div style={{ fontSize: 22, fontWeight: 700 }}>שלום, {profile.caregiverName}</div>
+          <div style={{ fontSize: 13, color: "#a09890", marginTop: 2 }}>טיפול ב{profile.patientName}</div>
+        </div>
+        <div style={{ display: "flex", background: "#fff", borderRadius: 14, padding: 4, marginBottom: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
+          {nav.map(n => <button key={n.k} onClick={() => setPage(n.k)} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "10px 0", border: "none", borderRadius: 12, background: page === n.k ? "#f3f0ec" : "transparent", cursor: "pointer", fontFamily: "inherit" }}>{Ic[n.i]?.(20, page === n.k ? "#4a4a4a" : "#b5afa7")}<span style={{ fontSize: 11, fontWeight: 600, color: page === n.k ? "#3a3630" : "#b5afa7" }}>{n.l}</span></button>)}
+        </div>
+        {toast && <div style={{ position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)", zIndex: 999, background: "#3a3630", color: "#fff", padding: "10px 28px", borderRadius: 10, fontSize: 14, fontWeight: 600, boxShadow: "0 4px 20px rgba(0,0,0,0.15)", display: "flex", alignItems: "center", gap: 8 }}>{Ic.check(16, "#aaa")} {toast}</div>}
+        {page === "dashboard" && log && <Dashboard log={log} save={saveLog} date={date} setDate={setDate} profile={profile} />}
+        {page === "meds" && <Meds profile={profile} save={savePro} />}
+        {page === "report" && <Report profile={profile} />}
+        {page === "profile" && <Profile profile={profile} save={savePro} />}
+      </div>
+    </div>
+  );
+}
+
+// ============ SETUP ============
+function Setup({ step, setStep, onDone }) {
+  const [ok, setOk] = useState(false);
+  const [f, sF] = useState({ patientName:"",patientId:"",birthDate:"",diagnoses:"",allergies:"",caregiverName:"",caregiverPhone:"",doctorName:"",doctorPhone:"",kupat:"",emergencyContact:"",emergencyPhone:"",useDiapers:false });
+  const [sel, setSel] = useState([]);
+  const [ms, setMs] = useState("");
+  const [mf, setMf] = useState("הכל");
+  const [sc, setSc] = useState(false);
+  const [cm, setCm] = useState({ name:"",dosage:"",times:"" });
+  const cats = ["הכל", ...new Set(MEDICATION_DB.map(m => m.category))];
+  const filt = MEDICATION_DB.filter(m => (!ms || m.name.includes(ms) || m.generic.toLowerCase().includes(ms.toLowerCase())) && (mf === "הכל" || m.category === mf));
+
+  if (step === 0) return (<div>
+    <Card sx={{ padding: 24, textAlign: "center" }}><Circ icon="home" bg="#f3f0ec" color="#5a4e42" size={56} /><h1 style={{ fontSize: 22, fontWeight: 700, margin: "12px 0 4px" }}>מערכת ניהול טיפול יומי</h1><p style={{ fontSize: 14, color: "#a09890" }}>ניהול ומעקב אחר טיפול בקשישים</p></Card>
+    <Card sx={{ padding: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}><Circ icon="shield" bg="#f0ede8" color="#6b6058" size={36} /><span style={{ fontSize: 16, fontWeight: 700 }}>הסכמה לאיסוף מידע</span></div>
+      <div style={{ background: "#faf9f7", borderRadius: 10, padding: 14, fontSize: 13, lineHeight: 1.8, whiteSpace: "pre-wrap", maxHeight: 240, overflowY: "auto", border: "1px solid #eee", marginBottom: 14 }}>{PRIVACY_TEXT}</div>
+      <div onClick={() => setOk(!ok)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 10, cursor: "pointer", background: ok ? "#f3f1ee" : "#faf9f7", border: ok ? "1.5px solid #5a5650" : "1.5px solid transparent" }}><Chk on={ok} toggle={() => {}} /><span style={{ fontWeight: 600, fontSize: 14 }}>קראתי והבנתי ואני מסכים/ה</span></div>
+      <div style={{ marginTop: 16 }}><Btn v="primary" full dis={!ok} onClick={() => setStep(1)}>המשך</Btn></div>
+    </Card>
+  </div>);
+
+  if (step === 1) return (<div>
+    <Card sx={{ padding: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}><Circ icon="user" bg="#f0ede8" color="#6b6058" size={36} /><span style={{ fontSize: 16, fontWeight: 700 }}>פרטי המטופל/ת ואנשי קשר</span></div>
+      {[["patientName","שם המטופל/ת *","שם מלא"],["patientId","ת.ז.",""],["kupat","קופת חולים","כללית/מכבי/מאוחדת/לאומית"],["caregiverName","שם המטפל/ת *","שם מלא"],["caregiverPhone","טלפון מטפל/ת",""],["doctorName","רופא/ה",""],["doctorPhone","טלפון רופא/ה",""],["emergencyContact","איש קשר חירום",""],["emergencyPhone","טלפון חירום",""]].map(([k,l,p]) => <div key={k} style={{ marginBottom: 8 }}><label style={{ fontSize: 13, fontWeight: 600, color: "#6b6058", display: "block", marginBottom: 3 }}>{l}</label><Inp type={k==="birthDate"?"date":"text"} value={f[k]} onChange={e => sF({...f,[k]:e.target.value})} placeholder={p} /></div>)}
+      <div style={{ marginBottom: 8 }}><label style={{ fontSize: 13, fontWeight: 600, color: "#6b6058", display: "block", marginBottom: 3 }}>תאריך לידה</label><Inp type="date" value={f.birthDate} onChange={e => sF({...f,birthDate:e.target.value})} /></div>
+      <div style={{ marginBottom: 8 }}><label style={{ fontSize: 13, fontWeight: 600, color: "#6b6058", display: "block", marginBottom: 3 }}>אבחנות</label><Txa value={f.diagnoses} onChange={e => sF({...f,diagnoses:e.target.value})} placeholder="סוכרת, דמנציה..." rows={2} /></div>
+      <div style={{ marginBottom: 8 }}><label style={{ fontSize: 13, fontWeight: 600, color: "#6b6058", display: "block", marginBottom: 3 }}>אלרגיות</label><Txa value={f.allergies} onChange={e => sF({...f,allergies:e.target.value})} rows={2} /></div>
+      <div onClick={()=>sF({...f,useDiapers:!f.useDiapers})} style={{ display:"flex",alignItems:"center",gap:10,padding:"12px 14px",borderRadius:10,cursor:"pointer",background:f.useDiapers?"#f3f1ee":"#faf9f7",border:f.useDiapers?"1.5px solid #5a5650":"1.5px solid #e2ddd6",marginBottom:8 }}><Chk on={f.useDiapers} toggle={()=>{}}/><span style={{ fontWeight:600,fontSize:14 }}>המטופל/ת משתמש/ת בחיתולים</span></div>
+      <div style={{ display: "flex", gap: 8, marginTop: 16 }}><Btn v="outline" onClick={() => setStep(0)}>חזרה</Btn><Btn v="primary" full dis={!f.patientName||!f.caregiverName} onClick={() => setStep(2)}>המשך לתרופות</Btn></div>
+    </Card>
+  </div>);
+
+  if (step === 2) return (<div>
+    <Card sx={{ padding: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}><Circ icon="pill" bg="#f3f1ee" color="#6b6058" size={36} /><span style={{ fontSize: 16, fontWeight: 700 }}>תרופות קבועות</span></div>
+      <p style={{ fontSize: 13, color: "#a09890", marginBottom: 10 }}>סמן/י תרופות. ניתן לערוך גם מאוחר יותר.</p>
+      <Inp value={ms} onChange={e => setMs(e.target.value)} placeholder="🔍 חיפוש..." sx={{ marginBottom: 8 }} />
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>{cats.slice(0,12).map(c => <Tag key={c} on={mf===c} onClick={() => setMf(c)}>{c}</Tag>)}</div>
+      {sel.length > 0 && <div style={{ background: "#f3f1ee", borderRadius: 10, padding: 10, marginBottom: 10 }}><div style={{ fontSize: 12, fontWeight: 700, color: "#5a5650", marginBottom: 4 }}>נבחרו ({sel.length}):</div><div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>{sel.map((m,i) => <Tag key={i} on c="#5a5650" onClick={() => setSel(sel.filter((_,j)=>j!==i))}>✕ {m.name}</Tag>)}</div></div>}
+      <div style={{ maxHeight: 260, overflowY: "auto", borderRadius: 10, border: "1px solid #eee" }}>
+        {filt.map(m => { const s = sel.some(x=>x.id===m.id); return (<div key={m.id} onClick={() => s ? setSel(sel.filter(x=>x.id!==m.id)) : setSel([...sel,{...m,dosage:"",times:""}])} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid #f5f3f0", background: s ? "#f9faf8" : "#fff" }}><Chk on={s} toggle={()=>{}} /><div style={{ flex: 1 }}><div style={{ fontWeight: 600, fontSize: 13 }}>{m.name}</div><div style={{ fontSize: 11, color: "#a09890" }}>{m.generic} — {m.purpose}</div></div><span style={{ fontSize: 10, color: "#b5afa7", background: "#f5f3f0", padding: "2px 8px", borderRadius: 10 }}>{m.category}</span></div>); })}
+      </div>
+      <Btn v="soft" sm full onClick={() => setSc(!sc)} sx={{ marginTop: 8 }}>{Ic.plus(14,"#5a4e42")} תרופה מותאמת</Btn>
+      {sc && <div style={{ background: "#faf9f7", borderRadius: 10, padding: 12, marginTop: 8 }}><Inp value={cm.name} onChange={e => setCm({...cm,name:e.target.value})} placeholder="שם" sx={{ marginBottom: 6 }} /><div style={{ display: "flex", gap: 6 }}><Inp value={cm.dosage} onChange={e => setCm({...cm,dosage:e.target.value})} placeholder="מינון" /><Inp value={cm.times} onChange={e => setCm({...cm,times:e.target.value})} placeholder="זמני מתן" /></div><Btn v="primary" sm onClick={() => { if(cm.name){ setSel([...sel,{id:`c_${Date.now()}`,name:cm.name,generic:"",category:"מותאם",purpose:"",dosage:cm.dosage,times:cm.times}]); setCm({name:"",dosage:"",times:""}); setSc(false); }}} sx={{ marginTop: 8 }}>הוסף</Btn></div>}
+      <div style={{ display: "flex", gap: 8, marginTop: 16 }}><Btn v="outline" onClick={() => setStep(1)}>חזרה</Btn><Btn v="primary" full onClick={() => { onDone({...f,medications:sel,createdAt:new Date().toISOString()}); setStep(3); }}>{Ic.save(16,"#fff")} שמור והתחל</Btn></div>
+    </Card>
+  </div>);
+  return null;
+}
+
+// ============ DASHBOARD ============
+function Dashboard({ log, save, date, setDate, profile }) {
+  const [op, setOp] = useState(null);
+  const [iF, sIF] = useState({ type:"",time:"",description:"" });
+  const [tF, sTF] = useState({ time:"",type:"",notes:"" });
+  const [medEdit, setMedEdit] = useState(null);
+  const [notes, setNotes] = useState(log.generalNotes||"");
+  useEffect(() => { setNotes(log.generalNotes||""); }, [log.date]);
+  const tg = s => setOp(op===s?null:s);
+  const u = (p, v) => { const n = JSON.parse(JSON.stringify(log)); const k=p.split("."); let o=n; for(let i=0;i<k.length-1;i++)o=o[k[i]]; o[k[k.length-1]]=v; save(n); };
+
+  const INC = ["התקף","כעס/תוקפנות","כאבים","נפילה","בלבול","סירוב טיפול","חום","קוצר נשימה","הקאה/שלשול","אחר"];
+  const MOODS = [{v:"מצוין",e:"😊"},{v:"טוב",e:"🙂"},{v:"סביר",e:"😐"},{v:"עצוב",e:"😢"},{v:"חרד",e:"😰"},{v:"כועס",e:"😠"}];
+  const SLEEPS = ["שינה טובה","שינה סבירה","ישן/ה מעט","לא ישן/ה כלל","קם/ה בלילה"];
+  const pct = (()=>{ let t=0,d=0; log.medications.forEach(m=>{t++;if(m.given)d++}); t++;if(log.bathing.done)d++; ["breakfast","lunch","dinner"].forEach(m=>{t++;if(log.meals[m].done)d++}); t+=2;if(log.physicalActivity.done)d++;if(log.cognitiveActivity.done)d++; return t?Math.round(d/t*100):0; })();
+
+  const Sec = ({ icon, bg, col, title, badge, red, isOpen, onTog, children }) => (
+    <Card><div onClick={onTog} style={{ display:"flex",alignItems:"center",gap:12,padding:"14px 16px",cursor:"pointer" }}><Circ icon={icon} bg={bg} color={col} size={40} /><div style={{ flex:1 }}><div style={{ fontWeight:700,fontSize:15,color:"#3a3630" }}>{title}</div></div>{badge&&<span style={{ fontSize:12,fontWeight:600,padding:"3px 10px",borderRadius:8,background:red?"#fef0ee":"#f3f1ee",color:red?"#b5544d":"#6b6058" }}>{badge}</span>}<span style={{ transition:"transform 0.2s",transform:isOpen?"rotate(180deg)":"rotate(0)" }}>{Ic.down(18,"#c8c4be")}</span></div>{isOpen&&<div style={{ borderTop:"1px solid #f0ede8",padding:"6px 0 10px" }}>{children}</div>}</Card>
+  );
+
+  return (<div>
+    <Card sx={{ display:"flex",alignItems:"center",padding:"10px 14px" }}>
+      <div onClick={()=>setDate(new Date(new Date(date).getTime()+86400000).toISOString().split("T")[0])} style={{ cursor:"pointer",padding:6 }}>{Ic.right(20,"#6b6058")}</div>
+      <div style={{ flex:1,textAlign:"center" }}><div style={{ fontWeight:700,fontSize:15 }}>{fmtD(date)}</div>{date===today()&&<span style={{ fontSize:11,color:"#5a5650",fontWeight:600 }}>היום</span>}</div>
+      <div onClick={()=>setDate(new Date(new Date(date).getTime()-86400000).toISOString().split("T")[0])} style={{ cursor:"pointer",padding:6 }}>{Ic.left(20,"#6b6058")}</div>
+    </Card>
+
+    <Card sx={{ padding:"12px 16px" }}>
+      <div style={{ display:"flex",justifyContent:"space-between",marginBottom:5 }}><span style={{ fontSize:13,fontWeight:600 }}>התקדמות</span><span style={{ fontSize:13,fontWeight:700,color:"#5a5650" }}>{pct}%</span></div>
+      <div style={{ height:6,borderRadius:3,background:"#eceae6",overflow:"hidden" }}><div style={{ height:"100%",borderRadius:3,width:`${pct}%`,background:pct>70?"#5a5650":pct>40?"#a09890":"#cf6b5e",transition:"width 0.4s" }}/></div>
+    </Card>
+
+    <Sec icon="pill" bg="#eef3eb" col="#5d7f4e" title="תרופות" badge={`${log.medications.filter(m=>m.given).length}/${log.medications.length}`} isOpen={op==="meds"} onTog={()=>tg("meds")}>
+      {log.medications.length===0&&<div style={{ padding:16,textAlign:"center",color:"#a09890",fontSize:13 }}>עבור/י ל"תרופות" להוספה.</div>}
+      {log.medications.map((m,i)=>(
+        <div key={i}>
+          <div style={{ display:"flex",alignItems:"flex-start",gap:10,padding:"10px 16px",borderBottom:medEdit===i?"none":"1px solid #f8f6f3" }}>
+            <div style={{ paddingTop:2 }}><Chk on={m.given} toggle={()=>{ const ms=[...log.medications]; ms[i]={...ms[i],given:!ms[i].given,time:!ms[i].given?fmtT():"",reason:ms[i].given?"":ms[i].reason}; save({...log,medications:ms}); }}/></div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontWeight:600,fontSize:14,color:m.given?"#a09890":"#2d2a26",textDecoration:m.given?"line-through":"none" }}>{m.name}</div>
+              {m.dosage&&<div style={{ fontSize:12,color:"#b5afa7" }}>{m.dosage}{m.times?` · ${m.times}`:""}</div>}
+              {m.given&&m.time&&<div style={{ fontSize:11,color:"#5a5650",marginTop:2 }}>ניתנה ב-{m.time}</div>}
+              {!m.given&&<Inp value={m.reason} placeholder="סיבה לאי מתן (אופציונלי)" onChange={e=>{ const ms=[...log.medications]; ms[i]={...ms[i],reason:e.target.value}; save({...log,medications:ms}); }} sx={{ marginTop:6,fontSize:12,padding:"6px 10px" }}/>}
+            </div>
+            <span onClick={()=>setMedEdit(medEdit===i?null:i)} style={{ cursor:"pointer",padding:4 }}>{Ic.edit(15,"#c8c4be")}</span>
+          </div>
+          {medEdit===i&&(
+            <div style={{ padding:"8px 16px 12px",background:"#faf9f7",borderBottom:"1px solid #f0ede8" }}>
+              <div style={{ display:"flex",gap:6,marginBottom:8 }}>
+                <Inp value={m.dosage||""} onChange={e=>{ const ms=[...log.medications]; ms[i]={...ms[i],dosage:e.target.value}; save({...log,medications:ms}); }} placeholder="מינון" sx={{ flex:1,fontSize:12,padding:"6px 10px" }}/>
+                <Inp value={m.times||""} onChange={e=>{ const ms=[...log.medications]; ms[i]={...ms[i],times:e.target.value}; save({...log,medications:ms}); }} placeholder="זמני מתן" sx={{ flex:1,fontSize:12,padding:"6px 10px" }}/>
+              </div>
+              <div style={{ display:"flex",gap:6,justifyContent:"flex-end" }}>
+                <Btn v="soft" sm onClick={()=>{const ms=log.medications.filter((_,j)=>j!==i);save({...log,medications:ms});setMedEdit(null)}} sx={{ color:"#b5544d",fontSize:11 }}>{Ic.x(12,"#b5544d")} הסר מהיום</Btn>
+                <Btn v="soft" sm onClick={()=>setMedEdit(null)} sx={{ fontSize:11 }}>סגור</Btn>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </Sec>
+
+    <Sec icon="drop" bg="#edf4f8" col="#5a8ba8" title="רחצה/היגיינה" badge={(log.bathing?.types||[]).length>0?`${(log.bathing.types||[]).length}`:log.bathing?.done?"בוצע":null} isOpen={op==="bath"} onTog={()=>tg("bath")}>
+      <div style={{ padding:"8px 16px 10px" }}>
+        <div style={{ fontSize:13,fontWeight:600,color:"#6b6058",marginBottom:8 }}>סמן/י מה בוצע:</div>
+        {["רחצה חצי גוף","מקלחת מלאה","מקלחת וחפיפה","גזירת ציפורניים"].map(t=>{
+          const types = log.bathing?.types||[];
+          const on = types.includes(t);
+          return <div key={t} style={{ display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid #f8f6f3",cursor:"pointer" }} onClick={()=>{
+            const nt = on ? types.filter(x=>x!==t) : [...types,t];
+            save({...log, bathing:{...log.bathing, done:nt.length>0, types:nt}});
+          }}><Chk on={on} toggle={()=>{}}/><span style={{ fontSize:14,fontWeight:on?600:400 }}>{t}</span></div>;
+        })}
+        <Inp value={log.bathing?.notes||""} onChange={e=>save({...log,bathing:{...log.bathing,notes:e.target.value}})} placeholder="הערות" sx={{ fontSize:13,marginTop:8 }}/>
+      </div>
+    </Sec>
+
+    <Sec icon="fork" bg="#fef6ed" col="#c4913f" title="ארוחות ושתייה" badge={`${["breakfast","lunch","dinner"].filter(m=>log.meals[m].done).length}/3`} isOpen={op==="meals"} onTog={()=>tg("meals")}>
+      {[{k:"breakfast",l:"בוקר"},{k:"lunch",l:"צהריים"},{k:"dinner",l:"ערב"},{k:"snacks",l:"ביניים"}].map(ml=>(
+        <div key={ml.k}><div style={{ display:"flex",alignItems:"center",gap:10,padding:"10px 16px" }}><Chk on={log.meals[ml.k].done} toggle={()=>u(`meals.${ml.k}.done`,!log.meals[ml.k].done)}/><span style={{ fontWeight:600,fontSize:14 }}>ארוחת {ml.l}</span></div>{log.meals[ml.k].done&&<div style={{ padding:"0 16px 6px" }}><Inp value={log.meals[ml.k].notes} onChange={e=>u(`meals.${ml.k}.notes`,e.target.value)} placeholder="מה אכל/ה?" sx={{ fontSize:13 }}/></div>}</div>
+      ))}
+      <div style={{ borderTop:"1px solid #f0ede8",padding:"10px 16px" }}>
+        <div style={{ fontSize:13,fontWeight:600,color:"#6b6058",marginBottom:8 }}>🥤 שתייה (כוסות נוזלים)</div>
+        <div style={{ display:"flex",alignItems:"center",gap:10 }}>
+          <Btn v="soft" sm onClick={()=>save({...log,fluids:Math.max(0,(log.fluids||0)-1)})} sx={{ padding:"6px 14px",fontSize:18,fontWeight:700 }}>−</Btn>
+          <div style={{ textAlign:"center",minWidth:60 }}><div style={{ fontSize:24,fontWeight:700,color:"#3a3630" }}>{log.fluids||0}</div><div style={{ fontSize:11,color:"#a09890" }}>{((log.fluids||0)*250)} מ"ל</div></div>
+          <Btn v="soft" sm onClick={()=>save({...log,fluids:(log.fluids||0)+1})} sx={{ padding:"6px 14px",fontSize:18,fontWeight:700 }}>+</Btn>
+        </div>
+      </div>
+    </Sec>
+
+    <Sec icon="wc" bg="#f3f0ec" col="#8b7565" title="צרכים" badge={log.toileting.length>0?`${log.toileting.length}`:null} isOpen={op==="wc"} onTog={()=>tg("wc")}>
+      {log.toileting.map((t,i)=><div key={i} style={{ display:"flex",alignItems:"center",gap:8,padding:"8px 16px",borderBottom:"1px solid #f8f6f3",fontSize:13 }}><span style={{ color:"#a09890" }}>{t.time}</span><Tag on c="#8b7565">{t.type}</Tag>{t.notes&&<span style={{ flex:1,color:"#6b6058" }}>{t.notes}</span>}<span style={{ cursor:"pointer" }} onClick={()=>save({...log,toileting:log.toileting.filter((_,j)=>j!==i)})}>{Ic.x(14,"#b5afa7")}</span></div>)}
+      <div style={{ display:"flex",gap:6,flexWrap:"wrap",padding:"8px 16px" }}>
+        <input type="time" value={tF.time} onChange={e=>sTF({...tF,time:e.target.value})} style={{ width:90,padding:"6px 8px",borderRadius:8,border:"1.5px solid #e2ddd6",fontSize:13,fontFamily:"inherit" }}/>
+        <select value={tF.type} onChange={e=>sTF({...tF,type:e.target.value})} style={{ flex:1,padding:"6px 8px",borderRadius:8,border:"1.5px solid #e2ddd6",fontSize:13,fontFamily:"inherit",background:"#fff" }}><option value="">סוג</option><option>שתן</option><option>יציאה</option><option>יציאה + שתן</option></select>
+        <Inp value={tF.notes} onChange={e=>sTF({...tF,notes:e.target.value})} placeholder="הערות" sx={{ flex:"1 1 100%",fontSize:13,padding:"6px 10px" }}/>
+        <Btn v="primary" sm onClick={()=>{ if(tF.type){ save({...log,toileting:[...log.toileting,{...tF,time:tF.time||fmtT()}]}); sTF({time:"",type:"",notes:""}); }}}>הוסף</Btn>
+      </div>
+    </Sec>
+
+    {profile.useDiapers && (
+      <Sec icon="wc" bg="#f3f0ec" col="#a09890" title="החלפת חיתולים" badge={(log.diapers||0)>0?`${log.diapers}`:null} isOpen={op==="diap"} onTog={()=>tg("diap")}>
+        <div style={{ padding:"10px 16px" }}>
+          <div style={{ fontSize:13,fontWeight:600,color:"#6b6058",marginBottom:10 }}>כמה חיתולים הוחלפו היום?</div>
+          <div style={{ display:"flex",gap:6,flexWrap:"wrap",marginBottom:8 }}>
+            {[1,2,3,4,5].map(n=><Btn key={n} v={(log.diapers||0)===n?"primary":"soft"} sm onClick={()=>save({...log,diapers:n})} sx={{ minWidth:44 }}>{n}</Btn>)}
+          </div>
+          <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+            <span style={{ fontSize:13,color:"#6b6058" }}>אחר:</span>
+            <Inp type="number" value={(log.diapers||0)>5?(log.diapers||""):""} onChange={e=>save({...log,diapers:parseInt(e.target.value)||0})} placeholder="מספר" sx={{ width:80,fontSize:13,padding:"6px 10px",textAlign:"center" }}/>
+          </div>
+        </div>
+      </Sec>
+    )}
+
+    <Sec icon="run" bg="#eef3eb" col="#5d7f4e" title="פעילות גופנית" badge={log.physicalActivity.done?"בוצע":null} isOpen={op==="phys"} onTog={()=>tg("phys")}>
+      <div style={{ display:"flex",alignItems:"center",gap:10,padding:"10px 16px" }}><Chk on={log.physicalActivity.done} toggle={()=>u("physicalActivity.done",!log.physicalActivity.done)}/><span style={{ fontWeight:600,fontSize:14 }}>בוצעה פעילות גופנית</span></div>
+      {log.physicalActivity.done&&<div style={{ padding:"0 16px 8px" }}>
+        <div style={{ display:"flex",gap:6,flexWrap:"wrap",marginBottom:8 }}>
+          {["הליכה","ישיבה","תנועת ידיים","תרגילים","פיזיותרפיה"].map(t=><Btn key={t} v={log.physicalActivity.type===t?"primary":"soft"} sm onClick={()=>u("physicalActivity.type",t)}>{t}</Btn>)}
+        </div>
+        <div style={{ display:"flex",gap:6,flexWrap:"wrap" }}>
+          <Inp value={log.physicalActivity.type&&!["הליכה","ישיבה","תנועת ידיים","תרגילים","פיזיותרפיה"].includes(log.physicalActivity.type)?log.physicalActivity.type:""} onChange={e=>u("physicalActivity.type",e.target.value)} placeholder="סוג אחר..." sx={{ flex:1,fontSize:13,padding:"6px 10px" }}/>
+          <Inp value={log.physicalActivity.duration} onChange={e=>u("physicalActivity.duration",e.target.value)} placeholder="דקות" sx={{ width:80,flex:"0 0 80px",fontSize:13,padding:"6px 10px" }}/>
+        </div>
+        <Inp value={log.physicalActivity.notes} onChange={e=>u("physicalActivity.notes",e.target.value)} placeholder="הערות" sx={{ flex:"1 1 100%",fontSize:13,padding:"6px 10px",marginTop:6 }}/>
+      </div>}
+    </Sec>
+
+    <Sec icon="brain" bg="#f0ecf5" col="#7d6b99" title="פעילות קוגניטיבית" badge={log.cognitiveActivity.done?"בוצע":null} isOpen={op==="cog"} onTog={()=>tg("cog")}>
+      <div style={{ display:"flex",alignItems:"center",gap:10,padding:"10px 16px" }}><Chk on={log.cognitiveActivity.done} toggle={()=>u("cognitiveActivity.done",!log.cognitiveActivity.done)}/><span style={{ fontWeight:600,fontSize:14 }}>בוצעה פעילות קוגניטיבית</span></div>
+      {log.cognitiveActivity.done&&<div style={{ padding:"0 16px 8px" }}>
+        <div style={{ display:"flex",gap:6,flexWrap:"wrap",marginBottom:8 }}>
+          {["משחק מוח","חידונים/תשבצים","יצירה","קריאה","טלוויזיה","משחק מחשב"].map(t=><Btn key={t} v={log.cognitiveActivity.type===t?"primary":"soft"} sm onClick={()=>u("cognitiveActivity.type",t)}>{t}</Btn>)}
+        </div>
+        <div style={{ display:"flex",gap:6,flexWrap:"wrap" }}>
+          <Inp value={log.cognitiveActivity.type&&!["משחק מוח","חידונים/תשבצים","יצירה","קריאה","טלוויזיה","משחק מחשב"].includes(log.cognitiveActivity.type)?log.cognitiveActivity.type:""} onChange={e=>u("cognitiveActivity.type",e.target.value)} placeholder="סוג אחר..." sx={{ flex:1,fontSize:13,padding:"6px 10px" }}/>
+          <Inp value={log.cognitiveActivity.duration} onChange={e=>u("cognitiveActivity.duration",e.target.value)} placeholder="דקות" sx={{ width:80,flex:"0 0 80px",fontSize:13,padding:"6px 10px" }}/>
+        </div>
+        <Inp value={log.cognitiveActivity.notes} onChange={e=>u("cognitiveActivity.notes",e.target.value)} placeholder="הערות" sx={{ flex:"1 1 100%",fontSize:13,padding:"6px 10px",marginTop:6 }}/>
+      </div>}
+    </Sec>
+
+    <Sec icon="steth" bg="#edf4f8" col="#5a8ba8" title="ביקור רופא" badge={log.doctorVisit.done?"בוצע":null} isOpen={op==="doc"} onTog={()=>tg("doc")}>
+      <div style={{ display:"flex",alignItems:"center",gap:10,padding:"10px 16px" }}><Chk on={log.doctorVisit.done} toggle={()=>u("doctorVisit.done",!log.doctorVisit.done)}/><span style={{ fontWeight:600,fontSize:14 }}>היה ביקור רופא</span></div>
+      {log.doctorVisit.done&&<div style={{ display:"flex",gap:6,flexWrap:"wrap",padding:"0 16px 8px" }}><Inp value={log.doctorVisit.doctor} onChange={e=>u("doctorVisit.doctor",e.target.value)} placeholder="שם הרופא/ה" sx={{ flex:1,fontSize:13,padding:"6px 10px" }}/><Inp value={log.doctorVisit.reason} onChange={e=>u("doctorVisit.reason",e.target.value)} placeholder="סיבה" sx={{ flex:1,fontSize:13,padding:"6px 10px" }}/><Txa value={log.doctorVisit.notes} onChange={e=>u("doctorVisit.notes",e.target.value)} placeholder="סיכום / המלצות" rows={2} sx={{ flex:"1 1 100%",fontSize:13,padding:"6px 10px" }}/></div>}
+    </Sec>
+
+    <Sec icon="alert" bg="#fef0ee" col="#b5544d" title="אירועים חריגים" badge={log.incidents.length>0?`${log.incidents.length}`:null} red={log.incidents.length>0} isOpen={op==="inc"} onTog={()=>tg("inc")}>
+      {log.incidents.map((inc,i)=><div key={i} style={{ display:"flex",alignItems:"center",gap:8,padding:"8px 16px",borderBottom:"1px solid #f8f6f3",fontSize:13 }}><span style={{ width:6,height:6,borderRadius:3,background:"#cf6b5e",flexShrink:0 }}/><Tag on c="#b5544d">{inc.type}</Tag><span style={{ color:"#a09890",fontSize:12 }}>{inc.time}</span><span style={{ flex:1 }}>{inc.description}</span><span style={{ cursor:"pointer" }} onClick={()=>save({...log,incidents:log.incidents.filter((_,j)=>j!==i)})}>{Ic.x(14,"#b5afa7")}</span></div>)}
+      <div style={{ padding:"8px 16px" }}><div style={{ display:"flex",gap:6,marginBottom:6 }}><select value={iF.type} onChange={e=>sIF({...iF,type:e.target.value})} style={{ flex:1,padding:"6px 8px",borderRadius:8,border:"1.5px solid #e2ddd6",fontSize:13,fontFamily:"inherit",background:"#fff" }}><option value="">סוג אירוע</option>{INC.map(t=><option key={t}>{t}</option>)}</select><input type="time" value={iF.time} onChange={e=>sIF({...iF,time:e.target.value})} style={{ width:90,padding:"6px 8px",borderRadius:8,border:"1.5px solid #e2ddd6",fontSize:13,fontFamily:"inherit" }}/></div><div style={{ display:"flex",gap:6 }}><Inp value={iF.description} onChange={e=>sIF({...iF,description:e.target.value})} placeholder="תיאור" sx={{ flex:1,fontSize:13,padding:"6px 10px" }}/><Btn v="danger" sm onClick={()=>{ if(iF.type){ save({...log,incidents:[...log.incidents,{...iF,time:iF.time||fmtT()}]}); sIF({type:"",time:"",description:""}); }}}>הוסף</Btn></div></div>
+    </Sec>
+
+    <Sec icon="smile" bg="#fef6ed" col="#c4913f" title="מצב רוח ושינה" isOpen={op==="mood"} onTog={()=>tg("mood")}>
+      <div style={{ padding:"6px 16px 10px" }}>
+        <div style={{ fontSize:13,fontWeight:600,color:"#6b6058",marginBottom:6 }}>מצב רוח</div>
+        <div style={{ display:"flex",gap:6,flexWrap:"wrap",marginBottom:12 }}>{MOODS.map(m=><Btn key={m.v} v={log.mood===m.v?"primary":"soft"} sm onClick={()=>u("mood",m.v)}>{m.e} {m.v}</Btn>)}</div>
+
+        <div style={{ fontSize:13,fontWeight:600,color:"#6b6058",marginBottom:6 }}>תסמיני דמנציה (ניתן לסמן מספר)</div>
+        <div style={{ display:"flex",gap:6,flexWrap:"wrap",marginBottom:6 }}>
+          {["הזיות","חרדה","זעם","אי שקט","רוצה הביתה"].map(s=>{
+            const ds = log.dementiaSymptoms||[];
+            const on = ds.includes(s);
+            return <Btn key={s} v={on?"primary":"soft"} sm onClick={()=>{
+              const nd = on ? ds.filter(x=>x!==s) : [...ds,s];
+              save({...log,dementiaSymptoms:nd});
+            }}>{s}</Btn>;
+          })}
+        </div>
+        <div style={{ display:"flex",gap:6,alignItems:"center" }}>
+          <Inp value={log.customDementia||""} onChange={e=>save({...log,customDementia:e.target.value})} placeholder="תסמין נוסף..." sx={{ flex:1,fontSize:13,padding:"6px 10px" }}/>
+        </div>
+
+        <div style={{ fontSize:13,fontWeight:600,color:"#6b6058",marginBottom:6,marginTop:12 }}>שינה (לילה קודם)</div>
+        <div style={{ display:"flex",gap:6,flexWrap:"wrap" }}>{SLEEPS.map(s=><Btn key={s} v={log.sleep===s?"primary":"soft"} sm onClick={()=>u("sleep",s)}>{s}</Btn>)}</div>
+      </div>
+    </Sec>
+
+    <Card sx={{ padding:"14px 16px" }}>
+      <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:10 }}>{Ic.note(18,"#8b7565")}<span style={{ fontWeight:700,fontSize:15 }}>הערות כלליות</span></div>
+      <Txa value={notes} onChange={e=>setNotes(e.target.value)} placeholder="הערות חופשיות..." rows={3}/>
+    </Card>
+    <Btn v="primary" full onClick={()=>save({...log,generalNotes:notes})} sx={{ padding:"14px 24px",fontSize:16,borderRadius:14,marginBottom:10 }}>{Ic.save(18,"#fff")} שמור יום</Btn>
+    <div style={{ textAlign:"center",fontSize:12,color:"#b5afa7",marginBottom:20 }}>סימונים נשמרים אוטומטית · "שמור יום" שומר הערות טקסט</div>
+  </div>);
+}
+
+// ============ MEDS PAGE ============
+function Meds({ profile, save }) {
+  const [ed, setEd] = useState(null);
+  const [sr, setSr] = useState("");
+  const [add, setAdd] = useState(false);
+  const [as, setAs] = useState("");
+  const [af, setAf] = useState("הכל");
+  const [sc, setSc] = useState(false);
+  const [cm, setCm] = useState({ name:"",dosage:"",times:"" });
+  const cats = ["הכל",...new Set(MEDICATION_DB.map(m=>m.category))];
+  const fa = MEDICATION_DB.filter(m=>!profile.medications.some(p=>p.id===m.id)&&(!as||m.name.includes(as)||m.generic.toLowerCase().includes(as.toLowerCase()))&&(af==="הכל"||m.category===af));
+  const uM = (i,f,v) => { const ms=[...profile.medications]; ms[i]={...ms[i],[f]:v}; save({...profile,medications:ms}); };
+  const rM = i => save({...profile,medications:profile.medications.filter((_,j)=>j!==i)});
+  const aM = m => save({...profile,medications:[...profile.medications,{...m,dosage:m.dosage||"",times:m.times||""}]});
+
+  return (<div>
+    <Card sx={{ padding:16 }}>
+      <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:14 }}><Circ icon="pill" bg="#f3f1ee" color="#6b6058" size={36}/><span style={{ fontWeight:700,fontSize:16 }}>תרופות קבועות ({profile.medications.length})</span></div>
+      {profile.medications.length>0&&<Inp value={sr} onChange={e=>setSr(e.target.value)} placeholder="🔍 חיפוש..." sx={{ marginBottom:10 }}/>}
+      {profile.medications.filter(m=>!sr||m.name.includes(sr)||(m.generic||"").toLowerCase().includes(sr.toLowerCase())).map((m,i)=>(
+        <div key={m.id||i} style={{ display:"flex",alignItems:"flex-start",gap:10,padding:"12px 0",borderBottom:"1px solid #f5f3f0" }}>
+          <Circ icon="pill" bg="#f5f3f0" color="#8b7565" size={36}/>
+          <div style={{ flex:1 }}>
+            <div style={{ fontWeight:600,fontSize:14 }}>{m.name}</div>
+            {m.generic&&<div style={{ fontSize:12,color:"#a09890" }}>{m.generic}</div>}
+            {(m.dosage||m.times)&&<div style={{ fontSize:12,color:"#6b6058",marginTop:2 }}>{m.dosage}{m.times?` · ${m.times}`:""}</div>}
+            {ed===i&&<div style={{ display:"flex",gap:6,marginTop:8,flexWrap:"wrap" }}><Inp value={m.dosage||""} onChange={e=>uM(i,"dosage",e.target.value)} placeholder="מינון" sx={{ flex:1,fontSize:13,padding:"6px 10px" }}/><Inp value={m.times||""} onChange={e=>uM(i,"times",e.target.value)} placeholder="זמני מתן" sx={{ flex:1,fontSize:13,padding:"6px 10px" }}/></div>}
+          </div>
+          <Btn v="soft" sm onClick={()=>setEd(ed===i?null:i)} sx={{ padding:"6px 10px" }}>{Ic.edit(14,"#6b6058")}</Btn>
+          <Btn v="soft" sm onClick={()=>rM(i)} sx={{ padding:"6px 10px" }}>{Ic.x(14,"#b5544d")}</Btn>
+        </div>
+      ))}
+      <Btn v="primary" full onClick={()=>setAdd(!add)} sx={{ marginTop:14 }}>{Ic.plus(16,"#fff")} הוסף תרופה</Btn>
+    </Card>
+    {add&&<Card sx={{ padding:16 }}>
+      <div style={{ fontWeight:700,fontSize:15,marginBottom:10 }}>הוסף מהרשימה</div>
+      <Inp value={as} onChange={e=>setAs(e.target.value)} placeholder="🔍 חיפוש..." sx={{ marginBottom:8 }}/>
+      <div style={{ display:"flex",gap:4,flexWrap:"wrap",marginBottom:8 }}>{cats.slice(0,12).map(c=><Tag key={c} on={af===c} onClick={()=>setAf(c)}>{c}</Tag>)}</div>
+      <div style={{ maxHeight:240,overflowY:"auto",borderRadius:10,border:"1px solid #eee" }}>
+        {fa.slice(0,30).map(m=><div key={m.id} onClick={()=>aM(m)} style={{ display:"flex",alignItems:"center",gap:10,padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid #f8f6f3" }}>{Ic.plus(16,"#5a5650")}<div style={{ flex:1 }}><div style={{ fontWeight:600,fontSize:13 }}>{m.name}</div><div style={{ fontSize:11,color:"#a09890" }}>{m.generic} — {m.purpose}</div></div></div>)}
+      </div>
+      <Btn v="soft" sm full onClick={()=>setSc(!sc)} sx={{ marginTop:8 }}>{Ic.plus(14,"#5a4e42")} תרופה מותאמת</Btn>
+      {sc&&<div style={{ background:"#faf9f7",borderRadius:10,padding:12,marginTop:8 }}><Inp value={cm.name} onChange={e=>setCm({...cm,name:e.target.value})} placeholder="שם" sx={{ marginBottom:6 }}/><div style={{ display:"flex",gap:6 }}><Inp value={cm.dosage} onChange={e=>setCm({...cm,dosage:e.target.value})} placeholder="מינון"/><Inp value={cm.times} onChange={e=>setCm({...cm,times:e.target.value})} placeholder="זמני מתן"/></div><Btn v="primary" sm onClick={()=>{ if(cm.name){ aM({id:`c_${Date.now()}`,name:cm.name,generic:"",category:"מותאם",purpose:"",dosage:cm.dosage,times:cm.times}); setCm({name:"",dosage:"",times:""}); setSc(false); }}} sx={{ marginTop:8 }}>הוסף</Btn></div>}
+    </Card>}
+  </div>);
+}
+
+// ============ REPORT ============
+function Report({ profile }) {
+  const [rng, setRng] = useState("week");
+  const [logs, setLogs] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [show, setShow] = useState(false);
+  const gen = async()=>{ setBusy(true); const d=rng==="week"?7:rng==="month"?30:1; const a=[]; for(let i=0;i<d;i++){ const dt=new Date(Date.now()-i*86400000).toISOString().split("T")[0]; try{ const r=await window.storage.get(`log:${dt}`); if(r?.value)a.push(JSON.parse(r.value)); }catch(e){} } setLogs(a.sort((a,b)=>a.date.localeCompare(b.date))); setShow(true); setBusy(false); };
+  const mc=()=>{let t=0,g=0;logs.forEach(l=>l.medications?.forEach(m=>{t++;if(m.given)g++}));return t?Math.round(g/t*100):0;};
+  const mlc=()=>{let t=0,d=0;logs.forEach(l=>["breakfast","lunch","dinner"].forEach(m=>{t++;if(l.meals?.[m]?.done)d++}));return t?Math.round(d/t*100):0;};
+  const ti=()=>logs.reduce((s,l)=>s+(l.incidents?.length||0),0);
+  const bd=()=>logs.filter(l=>l.bathing?.done).length;
+  const pd=()=>logs.filter(l=>l.physicalActivity?.done).length;
+  const cd=()=>logs.filter(l=>l.cognitiveActivity?.done).length;
+  const avgFl=()=>{const s=logs.reduce((a,l)=>a+(l.fluids||0),0);return logs.length?Math.round(s/logs.length*10)/10:0;};
+  const avgDi=()=>{const s=logs.reduce((a,l)=>a+(l.diapers||0),0);return logs.length?Math.round(s/logs.length*10)/10:0;};
+  const ms=()=>{const c={};logs.forEach(l=>{if(l.mood)c[l.mood]=(c[l.mood]||0)+1});return c;};
+  const ss=()=>{const c={};logs.forEach(l=>{if(l.sleep)c[l.sleep]=(c[l.sleep]||0)+1});return c;};
+  const ds=()=>{const c={};logs.forEach(l=>(l.dementiaSymptoms||[]).forEach(s=>{c[s]=(c[s]||0)+1}));logs.forEach(l=>{if(l.customDementia)c[l.customDementia]=(c[l.customDementia]||0)+1});return c;};
+  const T={t:{width:"100%",borderCollapse:"collapse",marginBottom:12,fontSize:12},h:{border:"1px solid #ccc",padding:"6px 8px",background:"#f5f3f0",fontWeight:700,textAlign:"right",fontSize:12},d:{border:"1px solid #e2ddd6",padding:"5px 8px",textAlign:"right",verticalAlign:"top",fontSize:12},c:{border:"1px solid #e2ddd6",padding:"5px 8px",textAlign:"center",verticalAlign:"top",fontSize:12}};
+
+  if(!show)return(<Card sx={{ padding:16 }}><div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:14 }}><Circ icon="clip" bg="#f3f0ec" color="#6b6058" size={36}/><span style={{ fontWeight:700,fontSize:16 }}>הפקת דוח</span></div><p style={{ fontSize:13,color:"#a09890",marginBottom:10 }}>דוח מפורט להדפסה.</p><div style={{ display:"flex",gap:6,marginBottom:14 }}>{[{v:"day",l:"יום"},{v:"week",l:"שבוע"},{v:"month",l:"חודש"}].map(r=><Btn key={r.v} v={rng===r.v?"primary":"soft"} sm onClick={()=>setRng(r.v)} sx={{ flex:1 }}>{r.l}</Btn>)}</div><Btn v="primary" full dis={busy} onClick={gen}>{busy?"מפיק...":"הפק דוח"}</Btn></Card>);
+
+  return(<div>
+    <div className="no-print"><Card sx={{ display:"flex",gap:8,padding:12 }}><Btn v="outline" onClick={()=>setShow(false)}>חזרה</Btn><Btn v="primary" full onClick={()=>window.print()}>{Ic.print(16,"#fff")} הדפס</Btn></Card></div>
+    <div id="printable-report" style={{ background:"#fff",color:"#000",fontFamily:"'Noto Sans Hebrew',sans-serif",direction:"rtl",padding:20,fontSize:13,lineHeight:1.6,borderRadius:14 }}>
+      <style>{`@media print{body *{visibility:hidden!important}#printable-report,#printable-report *{visibility:visible!important}#printable-report{position:absolute;top:0;right:0;left:0;padding:20px!important}.no-print{display:none!important}table{page-break-inside:auto}tr{page-break-inside:avoid}}`}</style>
+      <h1 style={{ fontSize:20,fontWeight:700,borderBottom:"2px solid #000",paddingBottom:6,marginBottom:10,marginTop:0 }}>דוח מעקב טיפולי — {profile.patientName}</h1>
+      <div style={{ fontSize:12,color:"#555",marginBottom:3 }}>ת.ז.: {profile.patientId||"—"} | ת.לידה: {profile.birthDate||"—"} | קופ"ח: {profile.kupat||"—"}</div>
+      <div style={{ fontSize:12,color:"#555",marginBottom:3 }}>אבחנות: {profile.diagnoses||"—"} | אלרגיות: {profile.allergies||"—"}</div>
+      <div style={{ fontSize:12,color:"#555",marginBottom:3 }}>מטפל/ת: {profile.caregiverName} | רופא/ה: {profile.doctorName||"—"}</div>
+      <div style={{ fontSize:12,color:"#555",marginBottom:3 }}>תקופה: {logs.length>0?`${logs[0]?.date} עד ${logs[logs.length-1]?.date}`:"—"} ({logs.length} ימים)</div>
+      <div style={{ fontSize:12,color:"#555",marginBottom:12 }}>הופק: {new Date().toLocaleDateString("he-IL")} {new Date().toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit"})}</div>
+      <h2 style={{ fontSize:15,fontWeight:700,borderBottom:"1px solid #999",paddingBottom:4,marginTop:16,marginBottom:8 }}>סיכום</h2>
+      <table style={T.t}><tbody><tr><td style={T.h}>ציות תרופתי</td><td style={T.c}>{mc()}%</td></tr><tr><td style={T.h}>ארוחות</td><td style={T.c}>{mlc()}%</td></tr><tr><td style={T.h}>שתייה (ממוצע)</td><td style={T.c}>{avgFl()} כוסות / {Math.round(avgFl()*250)} מ"ל</td></tr><tr><td style={T.h}>רחצה</td><td style={T.c}>{bd()}/{logs.length}</td></tr><tr><td style={T.h}>פע' גופנית</td><td style={T.c}>{pd()}/{logs.length}</td></tr><tr><td style={T.h}>פע' קוגניטיבית</td><td style={T.c}>{cd()}/{logs.length}</td></tr>{profile.useDiapers&&<tr><td style={T.h}>חיתולים (ממוצע)</td><td style={T.c}>{avgDi()} / יום</td></tr>}<tr><td style={T.h}>חריגים</td><td style={T.c}>{ti()}</td></tr></tbody></table>
+      <h2 style={{ fontSize:15,fontWeight:700,borderBottom:"1px solid #999",paddingBottom:4,marginTop:16,marginBottom:8 }}>תרופות</h2>
+      <table style={T.t}><thead><tr><th style={T.h}>תרופה</th><th style={{...T.h,width:70}}>ניתנה</th><th style={{...T.h,width:70}}>לא</th><th style={T.h}>סיבות</th></tr></thead><tbody>{profile.medications.map((m,mi)=>{const g=logs.filter(l=>l.medications?.[mi]?.given).length;const rs=logs.filter(l=>l.medications?.[mi]?.reason).map(l=>`${l.date}: ${l.medications[mi].reason}`);return<tr key={mi}><td style={T.d}>{m.name}{m.dosage?` (${m.dosage})`:""}</td><td style={T.c}>{g}/{logs.length}</td><td style={T.c}>{logs.length-g}</td><td style={T.d}>{rs.join(" ; ")||"—"}</td></tr>})}</tbody></table>
+      {Object.keys(ms()).length>0&&<><h2 style={{ fontSize:15,fontWeight:700,borderBottom:"1px solid #999",paddingBottom:4,marginTop:16,marginBottom:8 }}>מצב רוח</h2><table style={T.t}><thead><tr><th style={T.h}>מצב</th><th style={{...T.h,width:70}}>ימים</th></tr></thead><tbody>{Object.entries(ms()).map(([k,v])=><tr key={k}><td style={T.d}>{k}</td><td style={T.c}>{v}</td></tr>)}</tbody></table></>}
+      {Object.keys(ss()).length>0&&<><h2 style={{ fontSize:15,fontWeight:700,borderBottom:"1px solid #999",paddingBottom:4,marginTop:16,marginBottom:8 }}>שינה</h2><table style={T.t}><thead><tr><th style={T.h}>איכות</th><th style={{...T.h,width:70}}>ימים</th></tr></thead><tbody>{Object.entries(ss()).map(([k,v])=><tr key={k}><td style={T.d}>{k}</td><td style={T.c}>{v}</td></tr>)}</tbody></table></>}
+      {Object.keys(ds()).length>0&&<><h2 style={{ fontSize:15,fontWeight:700,borderBottom:"1px solid #999",paddingBottom:4,marginTop:16,marginBottom:8 }}>תסמיני דמנציה</h2><table style={T.t}><thead><tr><th style={T.h}>תסמין</th><th style={{...T.h,width:70}}>ימים</th></tr></thead><tbody>{Object.entries(ds()).map(([k,v])=><tr key={k}><td style={T.d}>{k}</td><td style={T.c}>{v}</td></tr>)}</tbody></table></>}
+      {ti()>0&&<><h2 style={{ fontSize:15,fontWeight:700,borderBottom:"1px solid #999",paddingBottom:4,marginTop:16,marginBottom:8 }}>חריגים ({ti()})</h2><table style={T.t}><thead><tr><th style={{...T.h,width:85}}>תאריך</th><th style={{...T.h,width:60}}>שעה</th><th style={{...T.h,width:90}}>סוג</th><th style={T.h}>תיאור</th></tr></thead><tbody>{logs.flatMap(l=>(l.incidents||[]).map(i=>({...i,date:l.date}))).map((i,j)=><tr key={j}><td style={T.d}>{i.date}</td><td style={T.c}>{i.time||"—"}</td><td style={T.d}>{i.type}</td><td style={T.d}>{i.description||"—"}</td></tr>)}</tbody></table></>}
+      {logs.some(l=>l.doctorVisit?.done)&&<><h2 style={{ fontSize:15,fontWeight:700,borderBottom:"1px solid #999",paddingBottom:4,marginTop:16,marginBottom:8 }}>ביקורי רופא</h2><table style={T.t}><thead><tr><th style={{...T.h,width:85}}>תאריך</th><th style={T.h}>רופא/ה</th><th style={T.h}>סיבה</th><th style={T.h}>סיכום</th></tr></thead><tbody>{logs.filter(l=>l.doctorVisit?.done).map((l,i)=><tr key={i}><td style={T.d}>{l.date}</td><td style={T.d}>{l.doctorVisit.doctor||"—"}</td><td style={T.d}>{l.doctorVisit.reason||"—"}</td><td style={T.d}>{l.doctorVisit.notes||"—"}</td></tr>)}</tbody></table></>}
+      <h2 style={{ fontSize:15,fontWeight:700,borderBottom:"1px solid #999",paddingBottom:4,marginTop:16,marginBottom:8 }}>פירוט יומי</h2>
+      {logs.map((l,li)=><div key={li} style={{ borderTop:"2px solid #333",paddingTop:8,marginTop:14,pageBreakInside:"avoid" }}><h3 style={{ fontSize:14,fontWeight:700,marginBottom:6,color:"#333" }}>{fmtD(l.date)}</h3><table style={T.t}><thead><tr><th style={T.h}>תרופה</th><th style={{...T.h,width:55}}>סטטוס</th><th style={{...T.h,width:55}}>שעה</th><th style={T.h}>הערה</th></tr></thead><tbody>{(l.medications||[]).map((m,mi)=><tr key={mi}><td style={T.d}>{m.name}</td><td style={T.c}>{m.given?"ניתנה":"לא"}</td><td style={T.c}>{m.time||"—"}</td><td style={T.d}>{m.reason||"—"}</td></tr>)}</tbody></table><table style={T.t}><tbody>
+        <tr><td style={T.h}>רחצה/היגיינה</td><td style={T.d}>{(l.bathing?.types||[]).length>0?(l.bathing.types.join(", "))+(l.bathing.notes?` — ${l.bathing.notes}`:""):"לא בוצעה"}</td></tr>
+        <tr><td style={T.h}>בוקר</td><td style={T.d}>{l.meals?.breakfast?.done?`כן${l.meals.breakfast.notes?` — ${l.meals.breakfast.notes}`:""}`:"לא"}</td></tr>
+        <tr><td style={T.h}>צהריים</td><td style={T.d}>{l.meals?.lunch?.done?`כן${l.meals.lunch.notes?` — ${l.meals.lunch.notes}`:""}`:"לא"}</td></tr>
+        <tr><td style={T.h}>ערב</td><td style={T.d}>{l.meals?.dinner?.done?`כן${l.meals.dinner.notes?` — ${l.meals.dinner.notes}`:""}`:"לא"}</td></tr>
+        <tr><td style={T.h}>ביניים</td><td style={T.d}>{l.meals?.snacks?.done?`כן${l.meals.snacks.notes?` — ${l.meals.snacks.notes}`:""}`:"—"}</td></tr>
+        <tr><td style={T.h}>שתייה</td><td style={T.d}>{(l.fluids||0)} כוסות ({(l.fluids||0)*250} מ"ל)</td></tr>
+        <tr><td style={T.h}>צרכים</td><td style={T.d}>{(l.toileting||[]).length>0?l.toileting.map(t=>`${t.time} ${t.type}${t.notes?` (${t.notes})`:""}`).join(" | "):"—"}</td></tr>
+        {profile.useDiapers&&<tr><td style={T.h}>חיתולים</td><td style={T.d}>{l.diapers||0} החלפות</td></tr>}
+        <tr><td style={T.h}>פע' גופנית</td><td style={T.d}>{l.physicalActivity?.done?`${l.physicalActivity.type||"בוצעה"}${l.physicalActivity.duration?` — ${l.physicalActivity.duration} דק'`:""}${l.physicalActivity.notes?` — ${l.physicalActivity.notes}`:""}`:"לא"}</td></tr>
+        <tr><td style={T.h}>פע' קוגניטיבית</td><td style={T.d}>{l.cognitiveActivity?.done?`${l.cognitiveActivity.type||"בוצעה"}${l.cognitiveActivity.duration?` — ${l.cognitiveActivity.duration} דק'`:""}${l.cognitiveActivity.notes?` — ${l.cognitiveActivity.notes}`:""}`:"לא"}</td></tr>
+        <tr><td style={T.h}>מצב רוח</td><td style={T.d}>{l.mood||"—"}</td></tr>
+        {(l.dementiaSymptoms||[]).length>0&&<tr><td style={T.h}>תסמיני דמנציה</td><td style={T.d}>{[...(l.dementiaSymptoms||[]),l.customDementia].filter(Boolean).join(", ")}</td></tr>}
+        <tr><td style={T.h}>שינה</td><td style={T.d}>{l.sleep||"—"}</td></tr>
+        {l.doctorVisit?.done&&<tr><td style={T.h}>ביקור רופא</td><td style={T.d}>{l.doctorVisit.doctor} — {l.doctorVisit.reason}{l.doctorVisit.notes?` — ${l.doctorVisit.notes}`:""}</td></tr>}
+        {(l.incidents||[]).length>0&&<tr><td style={T.h}>חריגים</td><td style={T.d}>{l.incidents.map(i=>`${i.time} ${i.type}: ${i.description}`).join(" | ")}</td></tr>}
+        {l.generalNotes&&<tr><td style={T.h}>הערות</td><td style={T.d}>{l.generalNotes}</td></tr>}
+      </tbody></table></div>)}
+      {logs.length===0&&<div style={{ textAlign:"center",padding:24,color:"#999" }}>לא נמצאו נתונים.</div>}
+      <div style={{ marginTop:24,borderTop:"1px solid #999",paddingTop:6,fontSize:11,color:"#999",textAlign:"center" }}>דוח מערכת ניהול טיפול | {new Date().toLocaleDateString("he-IL")}</div>
+    </div>
+  </div>);
+}
+
+// ============ PROFILE ============
+function Profile({ profile, save }) {
+  const [ed, setEd] = useState(false);
+  const [f, sF] = useState(profile);
+  const [del, setDel] = useState(false);
+  const sv = ()=>{ save(f); setEd(false); };
+  const rm = async()=>{ try{ await window.storage.delete("care-profile"); const ks=await window.storage.list("log:"); if(ks?.keys)for(const k of ks.keys)await window.storage.delete(k); }catch(e){} window.location.reload(); };
+
+  return(<div>
+    <Card sx={{ padding:16 }}>
+      <div style={{ display:"flex",alignItems:"center",gap:10,marginBottom:16 }}><Circ icon="user" bg="#f3f0ec" color="#6b6058" size={36}/><span style={{ fontWeight:700,fontSize:16 }}>פרופיל</span></div>
+      {!ed?<div>
+        {[{l:"שם",v:profile.patientName},{l:"ת.ז.",v:profile.patientId},{l:"ת.לידה",v:profile.birthDate},{l:"קופ\"ח",v:profile.kupat},{l:"אבחנות",v:profile.diagnoses},{l:"אלרגיות",v:profile.allergies},{l:"חיתולים",v:profile.useDiapers?"כן":"לא"}].filter(x=>x.v).map(x=><div key={x.l} style={{ marginBottom:6 }}><span style={{ fontSize:12,fontWeight:600,color:"#a09890" }}>{x.l}</span><div style={{ fontSize:14 }}>{x.v}</div></div>)}
+        <hr style={{ border:"none",borderTop:"1px solid #f0ede8",margin:"14px 0" }}/>
+        {[{l:"מטפל/ת",v:profile.caregiverName},{l:"טלפון",v:profile.caregiverPhone},{l:"רופא/ה",v:profile.doctorName},{l:"טל' רופא/ה",v:profile.doctorPhone},{l:"חירום",v:`${profile.emergencyContact||""} ${profile.emergencyPhone||""}`.trim()}].filter(x=>x.v).map(x=><div key={x.l} style={{ marginBottom:6 }}><span style={{ fontSize:12,fontWeight:600,color:"#a09890" }}>{x.l}</span><div style={{ fontSize:14 }}>{x.v}</div></div>)}
+        <Btn v="soft" full onClick={()=>{sF(profile);setEd(true)}} sx={{ marginTop:14 }}>{Ic.edit(16,"#5a4e42")} ערוך</Btn>
+      </div>:<div>
+        {[["patientName","שם"],["patientId","ת.ז."],["kupat","קופ\"ח"],["caregiverName","מטפל/ת"],["caregiverPhone","טלפון מטפל/ת"],["doctorName","רופא/ה"],["doctorPhone","טל' רופא/ה"],["emergencyContact","חירום"],["emergencyPhone","טל' חירום"]].map(([k,l])=><div key={k} style={{ marginBottom:8 }}><label style={{ fontSize:12,fontWeight:600,color:"#a09890",display:"block",marginBottom:3 }}>{l}</label><Inp type={k==="birthDate"?"date":"text"} value={f[k]||""} onChange={e=>sF({...f,[k]:e.target.value})}/></div>)}
+        <div style={{ marginBottom:8 }}><label style={{ fontSize:12,fontWeight:600,color:"#a09890",display:"block",marginBottom:3 }}>ת.לידה</label><Inp type="date" value={f.birthDate||""} onChange={e=>sF({...f,birthDate:e.target.value})}/></div>
+        <div style={{ marginBottom:8 }}><label style={{ fontSize:12,fontWeight:600,color:"#a09890",display:"block",marginBottom:3 }}>אבחנות</label><Txa value={f.diagnoses||""} onChange={e=>sF({...f,diagnoses:e.target.value})} rows={2}/></div>
+        <div style={{ marginBottom:8 }}><label style={{ fontSize:12,fontWeight:600,color:"#a09890",display:"block",marginBottom:3 }}>אלרגיות</label><Txa value={f.allergies||""} onChange={e=>sF({...f,allergies:e.target.value})} rows={2}/></div>
+        <div onClick={()=>sF({...f,useDiapers:!f.useDiapers})} style={{ display:"flex",alignItems:"center",gap:10,padding:"12px 14px",borderRadius:10,cursor:"pointer",background:f.useDiapers?"#f3f1ee":"#faf9f7",border:f.useDiapers?"1.5px solid #5a5650":"1.5px solid #e2ddd6",marginBottom:8 }}><Chk on={f.useDiapers} toggle={()=>{}}/><span style={{ fontWeight:600,fontSize:13 }}>המטופל/ת משתמש/ת בחיתולים</span></div>
+        <div style={{ display:"flex",gap:8,marginTop:14 }}><Btn v="outline" onClick={()=>setEd(false)}>ביטול</Btn><Btn v="primary" full onClick={sv}>{Ic.save(16,"#fff")} שמור</Btn></div>
+      </div>}
+    </Card>
+    <Card sx={{ padding:16 }}>
+      {!del?<Btn v="danger" full onClick={()=>setDel(true)}>מחק את כל הנתונים</Btn>:<div style={{ textAlign:"center" }}><p style={{ fontSize:13,color:"#b5544d",fontWeight:600,marginBottom:10 }}>כל הנתונים יימחקו. בטוח/ה?</p><div style={{ display:"flex",gap:8 }}><Btn v="outline" onClick={()=>setDel(false)} sx={{ flex:1 }}>ביטול</Btn><Btn v="danger" onClick={rm} sx={{ flex:1 }}>מחק</Btn></div></div>}
+    </Card>
+  </div>);
+}
+
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(React.createElement(CareApp));
+</script>
+</body>
+</html>
